@@ -26,7 +26,7 @@ const protect = async (req, res, next) => {
       // Determine active store context
       if (req.user.role === 'Super Admin') {
         const activeStoreId = req.headers['x-active-store'];
-        if (activeStoreId) {
+        if (activeStoreId && activeStoreId !== 'undefined' && activeStoreId !== 'null' && activeStoreId !== 'all') {
           req.activeStore = activeStoreId;
         }
       } else if (req.user.assignedStore) {

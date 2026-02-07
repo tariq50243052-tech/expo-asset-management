@@ -8,19 +8,27 @@ const Setup = () => {
   const { user } = useAuth();
   const [storage, setStorage] = useState(null);
   const [resetPassword, setResetPassword] = useState('');
+  const [deletionRequests, setDeletionRequests] = useState([]);
   const isMainAdmin = user?.role === 'Super Admin';
 
   useEffect(() => {
     if (isMainAdmin) {
-      const fetchStorage = async () => {
+      const fetchData = async () => {
         try {
-          const res = await api.get('/system/storage');
-          setStorage(res.data);
+          const [storageRes, storesRes] = await Promise.all([
+            api.get('/system/storage'),
+            api.get('/system/stores')
+          ]);
+          setStorage(storageRes.data);
+          
+          // Filter for deletion requests
+          const requests = storesRes.data.filter(s => s.deletionRequested);
+          setDeletionRequests(requests);
         } catch (e) {
           console.error(e);
         }
       };
-      fetchStorage();
+      fetchData();
     }
   }, [isMainAdmin]);
 
@@ -174,6 +182,63 @@ const Setup = () => {
           </div>
 
           <div className="pt-6 border-t border-gray-100">
+            {/* Deletion Requests Section */}
+            {deletionRequests.length > 0 && (
+              <div className="mb-8">
+                <div className="flex items-center mb-4 text-amber-600">
+                  <AlertTriangle className="w-5 h-5 mr-2" />
+                  <h3 className="text-lg font-bold">Pending Deletion Requests</h3>
+                </div>
+                <div className="bg-amber-50 border border-amber-100 rounded-lg p-4 space-y-4">
+                  {deletionRequests.map(store => (
+                    <div key={store._id} className="flex flex-col md:flex-row items-center justify-between bg-white p-4 rounded shadow-sm border border-amber-200">
+                      <div>
+                        <h4 className="font-bold text-gray-800">{store.name}</h4>
+                        <p className="text-sm text-gray-600">
+                          Requested: {new Date(store.deletionRequestedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="flex gap-2 mt-2 md:mt-0">
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm(`Reject deletion request for ${store.name}?`)) return;
+                            try {
+                              await api.post('/system/cancel-reset', { storeId: store._id });
+                              setDeletionRequests(prev => prev.filter(s => s._id !== store._id));
+                              alert('Request rejected.');
+                            } catch (e) {
+                              alert('Error: ' + e.message);
+                            }
+                          }}
+                          className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors text-sm font-medium"
+                        >
+                          Reject
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const pwd = prompt(`Enter Super Admin Password to DELETE ALL DATA for ${store.name}:`);
+                            if (!pwd) return;
+                            try {
+                              await api.post('/system/reset', { password: pwd, storeId: store._id });
+                              setDeletionRequests(prev => prev.filter(s => s._id !== store._id));
+                              alert(`Data for ${store.name} has been reset.`);
+                              window.location.reload();
+                            } catch (e) {
+                              console.error(e);
+                              alert('Reset failed: ' + (e.response?.data?.message || e.message));
+                            }
+                          }}
+                          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm font-medium"
+                        >
+                          Approve & Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center mb-4 text-red-600">
                <AlertTriangle className="w-5 h-5 mr-2" />
                <h3 className="text-lg font-bold">Danger Zone</h3>
@@ -196,21 +261,60 @@ const Setup = () => {
                     const ok = window.confirm('WARNING: This will erase all stores, assets, requests, and logs. Users, Products and Categories will remain. This action cannot be undone. Continue?');
                     if (!ok) return;
                     try {
-                      await api.post('/system/reset', { password: resetPassword });
+                      await api.post('/system/reset', { password: resetPassword, storeId: 'all' });
                       setResetPassword('');
-                      alert('Database reset completed. Users, Products and Categories preserved.');
+                      alert('System reset successful.');
                       window.location.reload();
-                    } catch (err) {
-                      console.error('Reset error details:', err);
-                      const msg = err.response?.data?.message || err.message || 'Unknown error';
-                      alert(`Reset failed: ${msg}`);
+                    } catch (e) {
+                      console.error(e);
+                      alert('Reset failed: ' + (e.response?.data?.message || e.message));
                     }
                   }}
-                  className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg transition-colors font-medium shadow-sm whitespace-nowrap"
+                  className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium shadow-sm"
                 >
-                  Reset Database
+                  Reset Full System
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Store Admin Deletion Request */}
+      {user?.role === 'Admin' && (
+        <div className="mt-12 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+           <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <Database className="w-6 h-6 text-gray-500 mr-2" />
+              <h2 className="text-xl font-bold text-gray-800">Store Data Management</h2>
+            </div>
+          </div>
+           <div className="pt-6 border-t border-gray-100">
+            <div className="flex items-center mb-4 text-red-600">
+               <AlertTriangle className="w-5 h-5 mr-2" />
+               <h3 className="text-lg font-bold">Danger Zone</h3>
+            </div>
+            <div className="bg-red-50 border border-red-100 rounded-lg p-4">
+              <p className="text-red-700 mb-4 text-sm">
+                Request a full data reset for your store. This requires Super Admin approval.
+                <br />
+                <strong>Warning:</strong> All assets and logs for this store will be erased. Users will remain.
+              </p>
+              <button
+                onClick={async () => {
+                   if (!window.confirm('Are you sure you want to request a data reset for your store?')) return;
+                   try {
+                     await api.post('/system/request-reset');
+                     alert('Deletion request submitted to Super Admin.');
+                   } catch (e) {
+                     console.error(e);
+                     alert('Request failed: ' + (e.response?.data?.message || e.message));
+                   }
+                }}
+                className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium shadow-sm"
+              >
+                Request Data Deletion
+              </button>
             </div>
           </div>
         </div>

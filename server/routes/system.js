@@ -60,6 +60,46 @@ router.get('/storage', protect, admin, async (req, res) => {
   }
 });
 
+// @desc    Request database reset (Store Admin)
+// @route   POST /api/system/request-reset
+// @access  Private/Admin
+router.post('/request-reset', protect, admin, async (req, res) => {
+  try {
+    // If Super Admin, they can just use /reset. This is for Store Admins.
+    if (req.user.role === 'Super Admin') {
+      return res.status(400).json({ message: 'Super Admin should use the main reset function.' });
+    }
+
+    if (!req.user.assignedStore) {
+      return res.status(400).json({ message: 'No assigned store found for this admin.' });
+    }
+
+    const store = await Store.findById(req.user.assignedStore);
+    if (!store) {
+      return res.status(404).json({ message: 'Store not found.' });
+    }
+
+    store.deletionRequested = true;
+    store.deletionRequestedAt = new Date();
+    await store.save();
+
+    // Log the request
+    await ActivityLog.create({
+      user: req.user.name,
+      email: req.user.email,
+      role: req.user.role,
+      action: 'System Reset Request',
+      details: `Deletion requested for Store: ${store.name}`,
+      store: store._id
+    });
+
+    res.json({ message: 'Deletion request submitted to Super Admin.' });
+  } catch (error) {
+    console.error('Error requesting reset:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // @desc    Reset database (keep users)
 // @route   POST /api/system/reset
 // @access  Private/SuperAdmin
@@ -97,6 +137,8 @@ router.post('/reset', protect, superAdmin, async (req, res) => {
     // If storeId === 'all', filter remains {} (Delete All)
 
     // Clear collections
+    // NOTE: We intentionally preserve 'User' (Admins/Technicians), 'Store' (Definitions), and 'AssetCategory' (Configuration)
+    // as per requirements to only delete "operational/transactional" data.
     await Promise.all([
       Asset.deleteMany(filter),
       // Store.deleteMany({}), // Preserved as per multi-store requirement
@@ -107,6 +149,14 @@ router.post('/reset', protect, superAdmin, async (req, res) => {
       Pass.deleteMany(filter),
       Permit.deleteMany(filter)
     ]);
+
+    // Reset deletionRequested flag if a specific store was reset
+    if (storeId && storeId !== 'all') {
+      await Store.findByIdAndUpdate(storeId, { 
+        deletionRequested: false, 
+        deletionRequestedAt: null 
+      });
+    }
 
     // Optional: Clear uploads folder except .gitkeep
     // Only if full reset? Or if we track file ownership by store?
@@ -142,6 +192,42 @@ router.post('/reset', protect, superAdmin, async (req, res) => {
     res.json({ message: 'System reset successful' });
   } catch (error) {
     console.error('Error resetting system:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// @desc    Cancel database reset request (Super Admin)
+// @route   POST /api/system/cancel-reset
+// @access  Private/SuperAdmin
+router.post('/cancel-reset', protect, superAdmin, async (req, res) => {
+  const { storeId } = req.body;
+  
+  if (!storeId) {
+    return res.status(400).json({ message: 'Store ID is required' });
+  }
+
+  try {
+    const store = await Store.findById(storeId);
+    if (!store) {
+      return res.status(404).json({ message: 'Store not found' });
+    }
+
+    store.deletionRequested = false;
+    store.deletionRequestedAt = null;
+    await store.save();
+
+    await ActivityLog.create({
+      user: req.user.name,
+      email: req.user.email,
+      role: req.user.role,
+      action: 'System Reset Cancelled',
+      details: `Deletion request rejected/cancelled for Store: ${store.name}`,
+      store: store._id
+    });
+
+    res.json({ message: 'Reset request cancelled successfully' });
+  } catch (error) {
+    console.error('Error cancelling reset:', error);
     res.status(500).json({ message: error.message });
   }
 });

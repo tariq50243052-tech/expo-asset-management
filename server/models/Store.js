@@ -26,6 +26,13 @@ const storeSchema = new mongoose.Schema({
     ref: 'Store',
     default: null,
     index: true
+  },
+  deletionRequested: {
+    type: Boolean,
+    default: false
+  },
+  deletionRequestedAt: {
+    type: Date
   }
 }, { timestamps: true });
 

@@ -109,8 +109,8 @@ const AddMembers = () => {
     try {
       const payload = { ...formData };
       
-      // Remove assignedStore if it's admin or empty
-      if (activeTab === 'admin' || !payload.assignedStore) {
+      // Remove assignedStore only if empty (Admin MUST have assignedStore)
+      if (!payload.assignedStore) {
         delete payload.assignedStore;
       }
 
