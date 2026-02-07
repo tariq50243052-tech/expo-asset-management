@@ -52,7 +52,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     // If allowedRoles doesn't include Super Admin explicitly, we assume they have access unless restricted.
     // However, existing routes use ['Admin'] or ['Technician'].
     // Let's allow Super Admin if 'Admin' is allowed.
-    const effectiveRole = user.role === 'Super Admin' ? 'Admin' : user.role;
+    // const effectiveRole = user.role === 'Super Admin' ? 'Admin' : user.role;
     
     // Check if user.role is in allowedRoles OR if user is Super Admin and 'Admin' is in allowedRoles
     const isAllowed = allowedRoles.includes(user.role) || (user.role === 'Super Admin' && allowedRoles.includes('Admin'));

@@ -144,14 +144,39 @@ app.get('*', (req, res) => {
 });
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI)
-  .then(async () => {
+const connectDB = async () => {
+  try {
+    await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 30000, // Keep trying to send operations for 30s
+      socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+    });
     console.log('MongoDB Connected');
+    
+    // Run seeders after successful connection
     await seedCategories();
     await seedStoresAndUsers();
     dropSerialUniqueIndex();
-  })
-  .catch(err => console.log(err));
+  } catch (err) {
+    console.error('MongoDB Connection Error:', err);
+    // Retry connection after 5 seconds
+    setTimeout(connectDB, 5000);
+  }
+};
+
+// MongoDB Event Listeners for "Always Connected" reliability
+mongoose.connection.on('disconnected', () => {
+  console.log('MongoDB disconnected! Attempting to reconnect...');
+});
+
+mongoose.connection.on('reconnected', () => {
+  console.log('MongoDB reconnected!');
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('MongoDB error:', err);
+});
+
+connectDB();
 
 // Seed Default Stores
 const seedStores = async () => {

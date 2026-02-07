@@ -51,6 +51,12 @@ router.put('/:id', protect, admin, async (req, res) => {
   try {
     const request = await Request.findById(req.params.id);
     if (!request) return res.status(404).json({ message: 'Request not found' });
+    
+    // Isolation Check
+    if (req.activeStore && request.store && request.store.toString() !== req.activeStore.toString()) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+
     request.status = req.body.status || request.status;
     await request.save();
     res.json(request);

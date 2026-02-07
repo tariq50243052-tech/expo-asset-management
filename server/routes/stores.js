@@ -22,6 +22,11 @@ router.get('/', protect, async (req, res) => {
       filter.parentStore = req.query.parent;
     }
 
+    // Filter by deletionRequested
+    if (req.query.deletionRequested === 'true') {
+      filter.deletionRequested = true;
+    }
+
     // Role-Based Filtering
     if (req.user.role !== 'Super Admin' && req.user.assignedStore) {
         // If user is restricted to a store, only show that store OR its children
@@ -167,11 +172,15 @@ router.delete('/:id', protect, admin, async (req, res) => {
             return res.status(403).json({ message: 'Cannot delete Main Store' });
         }
         
-        // Can only delete their own assigned store (if not main) OR children
-        const isAssignedStore = req.user.assignedStore && store._id.toString() === req.user.assignedStore.toString();
+        // Prevent deleting their own assigned root store (The "Database")
+        if (req.user.assignedStore && store._id.toString() === req.user.assignedStore.toString()) {
+            return res.status(403).json({ message: 'Cannot delete your assigned root store. Please request a reset via Setup.' });
+        }
+
+        // Can only delete children of their assigned store
         const isChildOfAssignedStore = req.user.assignedStore && store.parentStore?.toString() === req.user.assignedStore.toString();
 
-        if (!isAssignedStore && !isChildOfAssignedStore) {
+        if (!isChildOfAssignedStore) {
           return res.status(403).json({ message: 'Not authorized to delete this store' });
         }
       }

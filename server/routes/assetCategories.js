@@ -5,6 +5,23 @@ const Asset = require('../models/Asset');
 const { protect, admin } = require('../middleware/authMiddleware');
 const multer = require('multer');
 const path = require('path');
+const sharp = require('sharp');
+const fs = require('fs');
+
+// Helper to resize image
+const resizeImage = async (filePath) => {
+  try {
+    const buffer = await sharp(filePath)
+      .resize(500, 500, {
+        fit: 'cover',
+        position: 'center'
+      })
+      .toBuffer();
+    await fs.promises.writeFile(filePath, buffer);
+  } catch (error) {
+    console.error('Error resizing image:', error);
+  }
+};
 
 // Configure multer for image upload
 const storage = multer.diskStorage({
@@ -217,6 +234,7 @@ router.put('/products/:id', protect, admin, upload.single('image'), async (req, 
 
     if (name) product.name = name;
     if (req.file) {
+      await resizeImage(req.file.path);
       product.image = `/uploads/${req.file.filename}`;
     }
 
@@ -300,6 +318,9 @@ router.post('/products/:id/children', protect, admin, upload.single('image'), as
       return res.status(400).json({ message: 'Child product already exists' });
     }
 
+    if (req.file) {
+      await resizeImage(req.file.path);
+    }
     const image = req.file ? `/uploads/${req.file.filename}` : '';
 
     if (!product.children) product.children = [];
@@ -317,6 +338,10 @@ router.post('/products/:id/children', protect, admin, upload.single('image'), as
 // @access  Private/Admin
 router.post('/', protect, admin, upload.single('image'), async (req, res) => {
   const { name } = req.body;
+  
+  if (req.file) {
+    await resizeImage(req.file.path);
+  }
   const image = req.file ? `/uploads/${req.file.filename}` : '';
 
   try {
@@ -363,6 +388,7 @@ router.put('/:id', protect, admin, upload.single('image'), async (req, res) => {
     }
 
     if (req.file) {
+      await resizeImage(req.file.path);
       category.image = `/uploads/${req.file.filename}`;
     }
 

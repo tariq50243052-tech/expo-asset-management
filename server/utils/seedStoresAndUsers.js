@@ -66,10 +66,12 @@ const seedStoresAndUsers = async () => {
     ];
 
     for (const adminData of defaultAdmins) {
-      const adminExists = await User.findOne({ email: adminData.email });
-      if (!adminExists) {
-        const store = storeMap[adminData.storeName];
-        if (store) {
+      const store = storeMap[adminData.storeName];
+      
+      if (store) {
+        let adminUser = await User.findOne({ email: adminData.email });
+        
+        if (!adminUser) {
           const salt = await bcrypt.genSalt(10);
           const hashedPassword = await bcrypt.hash('admin123', salt);
           await User.create({
@@ -80,9 +82,29 @@ const seedStoresAndUsers = async () => {
             assignedStore: store._id
           });
           console.log(`Created ${adminData.name}: ${adminData.email} / admin123`);
+        } else {
+          // Check and update permissions if needed
+          let needsUpdate = false;
+          
+          if (adminUser.role !== 'Admin') {
+            adminUser.role = 'Admin';
+            needsUpdate = true;
+          }
+          
+          if (!adminUser.assignedStore || adminUser.assignedStore.toString() !== store._id.toString()) {
+            adminUser.assignedStore = store._id;
+            needsUpdate = true;
+          }
+
+          if (needsUpdate) {
+            await adminUser.save();
+            console.log(`Updated permissions for ${adminData.name} (Role: Admin, Store: ${adminData.storeName})`);
+          } else {
+            console.log(`Admin exists and is up to date: ${adminData.email}`);
+          }
         }
       } else {
-         console.log(`Admin exists: ${adminData.email}`);
+        console.error(`Store ${adminData.storeName} not found for admin ${adminData.email}`);
       }
     }
 

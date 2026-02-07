@@ -2,18 +2,20 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
-import { Users, ArrowLeft, Database, AlertTriangle, X, Store, Building2, ChevronRight, Settings, ShieldCheck, Activity, Search, Lock } from 'lucide-react';
+import { Users, ArrowLeft, Database, AlertTriangle, X, Store, Building2, ChevronRight, Settings, ShieldCheck, Activity, Search, Lock, LogOut } from 'lucide-react';
 import AddMembers from './AddMembers';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 
 const Portal = () => {
-  const { user, selectStore, activeStore } = useAuth();
+  const { user, selectStore, activeStore, logout } = useAuth();
   const navigate = useNavigate();
   const [stores, setStores] = useState([]);
+  const [deletionRequests, setDeletionRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showMembers, setShowMembers] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetStoreId, setResetStoreId] = useState('');
+  const [includeUsers, setIncludeUsers] = useState(false);
   const [resetPassword, setResetPassword] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -26,8 +28,12 @@ const Portal = () => {
 
     const fetchStores = async () => {
       try {
-        const response = await api.get('/stores?main=true');
-        setStores(response.data);
+        const [storesRes, requestsRes] = await Promise.all([
+          api.get('/stores?main=true'),
+          api.get('/stores?deletionRequested=true')
+        ]);
+        setStores(storesRes.data);
+        setDeletionRequests(requestsRes.data);
       } catch (error) {
         console.error('Error fetching stores:', error);
       } finally {
@@ -68,12 +74,14 @@ const Portal = () => {
       setResetLoading(true);
       await api.post('/system/reset', { 
         password: resetPassword,
-        storeId: resetStoreId 
+        storeId: resetStoreId,
+        includeUsers
       });
       alert('Reset successful');
       setShowResetModal(false);
       setResetPassword('');
       setResetStoreId('');
+      setIncludeUsers(false);
       window.location.reload();
     } catch (err) {
       console.error(err);
@@ -153,6 +161,19 @@ const Portal = () => {
             <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition-all cursor-pointer shadow-sm">
               <ShieldCheck size={18} className="md:w-[20px] md:h-[20px]" />
             </div>
+
+            <button
+              onClick={() => {
+                if (window.confirm('Are you sure you want to logout?')) {
+                  logout();
+                  navigate('/login');
+                }
+              }}
+              className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-red-50 border border-red-100 flex items-center justify-center text-red-600 hover:bg-red-100 hover:text-red-700 transition-all cursor-pointer shadow-sm"
+              title="Logout"
+            >
+              <LogOut size={16} className="md:w-[18px] md:h-[18px]" />
+            </button>
           </div>
         </div>
       </header>
@@ -168,8 +189,49 @@ const Portal = () => {
           </p>
         </div>
 
+        {/* Pending Deletion Requests - Moved to Top for Visibility */}
+        {deletionRequests.length > 0 && (
+          <div className="mb-10 animate-fade-in-up">
+            <div className="bg-red-50 border border-red-100 rounded-xl p-4 md:p-6">
+              <h3 className="text-lg font-bold text-red-800 mb-4 flex items-center gap-2">
+                <AlertTriangle className="text-red-600" size={24} />
+                Pending Deletion Requests
+                <span className="bg-red-200 text-red-800 text-xs px-2 py-0.5 rounded-full">{deletionRequests.length}</span>
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {deletionRequests.map(store => (
+                  <div key={store._id} className="bg-white rounded-lg shadow-sm border border-red-200 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                      <h4 className="font-bold text-slate-900">{store.name}</h4>
+                      <div className="text-sm text-slate-500 mt-1 space-y-0.5">
+                         <p>Requested: {store.deletionRequestedAt ? new Date(store.deletionRequestedAt).toLocaleDateString() : 'N/A'}</p>
+                         {store.deletionRequestedBy && (
+                           <p className="text-xs text-slate-400">By: {store.deletionRequestedBy}</p>
+                         )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setResetStoreId(store._id);
+                        setShowResetModal(true);
+                      }}
+                      className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium text-sm transition-colors shadow-sm"
+                    >
+                      Review & Approve
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Stores Grid Section */}
         <div className="mb-12 md:mb-16">
+          <h3 className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 md:mb-6 border-b border-slate-200 pb-2">
+             Active Workspaces
+          </h3>
+          
           {stores.length === 0 ? (
              <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 border-dashed">
                 <Store size={48} className="mx-auto text-slate-300 mb-3" />
@@ -185,6 +247,25 @@ const Portal = () => {
              </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
+              {/* Global View Card */}
+              <button
+                  onClick={() => handleSelectStore('all')}
+                  className="group relative bg-white border border-slate-200 rounded-2xl p-5 md:p-6 shadow-sm hover:shadow-xl hover:border-blue-500/30 transition-all duration-300 text-left flex flex-col justify-between h-auto min-h-[180px] md:h-56 overflow-hidden"
+                >
+                    <div className="absolute top-0 right-0 w-24 h-24 md:w-32 md:h-32 bg-gradient-to-br from-blue-500/10 to-transparent rounded-bl-full -mr-8 -mt-8 md:-mr-10 md:-mt-10 transition-transform group-hover:scale-110 opacity-50 group-hover:opacity-100"></div>
+                    <div className="relative z-10 w-full">
+                        <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 mb-4 group-hover:scale-110 transition-transform duration-300 shadow-sm">
+                            <Activity size={24} />
+                        </div>
+                        <h3 className="text-lg md:text-xl font-bold text-slate-900 mb-1 group-hover:text-blue-700 transition-colors">Global View</h3>
+                        <p className="text-xs md:text-sm text-slate-500 font-medium">View All Assets & Stores</p>
+                    </div>
+                    <div className="relative z-10 flex items-center text-blue-600 font-bold text-xs md:text-sm mt-4 group-hover:translate-x-1 transition-transform">
+                        <span>Enter System</span>
+                        <ChevronRight size={16} className="ml-1" />
+                    </div>
+                </button>
+
               {stores.map((store) => (
                 <button
                   key={store._id}
@@ -312,7 +393,8 @@ const Portal = () => {
               <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-4 mb-6">
                  <p className="text-sm text-yellow-800 leading-relaxed">
                    <strong>Warning:</strong> This action will permanently delete all transactional data (Assets, Requests, Purchase Orders) for the selected scope. <br/><br/>
-                   <span className="font-semibold">Safe Data:</span> Users, Products, and Categories will be <span className="underline">preserved</span>.
+                   <span className="font-semibold">Safe Data:</span> {includeUsers ? 'Products and Categories' : 'Users, Products, and Categories'} will be <span className="underline">preserved</span>.
+                   {includeUsers && <span className="block mt-2 font-bold text-red-600">USERS (Admins/Technicians) WILL BE DELETED!</span>}
                  </p>
               </div>
 
@@ -326,6 +408,7 @@ const Portal = () => {
                       className="w-full appearance-none border border-slate-300 rounded-lg p-3 pr-10 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none bg-white text-slate-900 transition-shadow"
                     >
                       <option value="">-- Select Store to Reset --</option>
+                      <option value="all">⚠️ ENTIRE SYSTEM (All Stores)</option>
                       {stores.map(store => (
                         <option key={store._id} value={store._id}>{store.name}</option>
                       ))}
@@ -333,6 +416,38 @@ const Portal = () => {
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
                        <Store size={16} />
                     </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Deletion Options</label>
+                  <div className="space-y-3">
+                    <label className="flex items-center p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
+                      <input 
+                        type="radio" 
+                        name="deletionOption"
+                        checked={!includeUsers}
+                        onChange={() => setIncludeUsers(false)}
+                        className="w-4 h-4 text-red-600 focus:ring-red-500 border-gray-300"
+                      />
+                      <div className="ml-3">
+                        <span className="block text-sm font-medium text-slate-900">Data Only (Standard)</span>
+                        <span className="block text-xs text-slate-500">Deletes assets & logs. Keeps all users.</span>
+                      </div>
+                    </label>
+                    <label className="flex items-center p-3 border border-red-200 bg-red-50/30 rounded-lg cursor-pointer hover:bg-red-50 transition-colors">
+                      <input 
+                        type="radio" 
+                        name="deletionOption"
+                        checked={includeUsers}
+                        onChange={() => setIncludeUsers(true)}
+                        className="w-4 h-4 text-red-600 focus:ring-red-500 border-gray-300"
+                      />
+                      <div className="ml-3">
+                        <span className="block text-sm font-bold text-red-700">Full Wipe (Data + Users)</span>
+                        <span className="block text-xs text-red-600">Deletes data AND all Admins/Technicians.</span>
+                      </div>
+                    </label>
                   </div>
                 </div>
 

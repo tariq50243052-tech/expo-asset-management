@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Edit2, Trash2, X } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -30,7 +30,7 @@ const AddMembers = () => {
 
   useEffect(() => {
     fetchMembers();
-  }, [activeTab]);
+  }, [fetchMembers]);
 
   const fetchStores = async () => {
     try {
@@ -42,7 +42,7 @@ const AddMembers = () => {
     }
   };
 
-  const fetchMembers = async () => {
+  const fetchMembers = useCallback(async () => {
     setFetching(true);
     try {
       const endpoint = activeTab === 'technician' ? '/users' : '/users/admins';
@@ -53,7 +53,7 @@ const AddMembers = () => {
     } finally {
       setFetching(false);
     }
-  };
+  }, [activeTab]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });

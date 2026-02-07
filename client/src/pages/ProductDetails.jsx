@@ -14,25 +14,25 @@ const ProductDetails = () => {
   // Decode product name from URL
   const decodedProductName = decodeURIComponent(productName);
 
-  const fetchAssets = async () => {
-    setLoading(true);
-    try {
-      // Fetch assets for this product name
-      const res = await api.get('/assets', {
-        params: {
-          product_name: decodedProductName,
-          limit: 1000 // Fetch all for this view to calculate stats
-        }
-      });
-      setAssets(res.data.items || []);
-    } catch (err) {
-      console.error('Failed to fetch product assets:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchAssets = async () => {
+      setLoading(true);
+      try {
+        // Fetch assets for this product name
+        const res = await api.get('/assets', {
+          params: {
+            product_name: decodedProductName,
+            limit: 1000 // Fetch all for this view to calculate stats
+          }
+        });
+        setAssets(res.data.items || []);
+      } catch (err) {
+        console.error('Failed to fetch product assets:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchAssets();
   }, [decodedProductName]);
 

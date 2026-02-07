@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
@@ -18,22 +18,22 @@ const Stores = () => {
   // Update time every minute to refresh status
   const [, setCurrentTime] = useState(new Date());
 
-  useEffect(() => {
-    if (activeStore) {
-      fetchStores();
-    }
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
-    return () => clearInterval(timer);
-  }, [activeStore]);
-
-  const fetchStores = async () => {
+  const fetchStores = useCallback(async () => {
     try {
       const res = await api.get(`/stores?parent=${activeStore._id}`);
       setStores(res.data);
     } catch (err) {
       console.error(err);
     }
-  };
+  }, [activeStore]);
+
+  useEffect(() => {
+    if (activeStore) {
+      fetchStores();
+    }
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, [activeStore, fetchStores]);
 
   const handleAdd = async (e) => {
     e.preventDefault();

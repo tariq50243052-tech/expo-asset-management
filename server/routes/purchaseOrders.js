@@ -50,6 +50,10 @@ router.get('/:id', protect, admin, async (req, res) => {
   try {
     const po = await PurchaseOrder.findById(req.params.id).populate('vendor');
     if (po) {
+      // Enforce Isolation
+      if (req.activeStore && po.store && po.store.toString() !== req.activeStore.toString()) {
+        return res.status(404).json({ message: 'Purchase Order not found' });
+      }
       res.json(po);
     } else {
       res.status(404).json({ message: 'Purchase Order not found' });

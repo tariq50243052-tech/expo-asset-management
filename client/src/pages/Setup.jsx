@@ -197,6 +197,9 @@ const Setup = () => {
                         <p className="text-sm text-gray-600">
                           Requested: {new Date(store.deletionRequestedAt).toLocaleDateString()}
                         </p>
+                        {store.deletionRequestedBy && (
+                            <p className="text-xs text-gray-500 mt-1">By: {store.deletionRequestedBy}</p>
+                        )}
                       </div>
                       <div className="flex gap-2 mt-2 md:mt-0">
                         <button

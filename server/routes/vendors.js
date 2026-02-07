@@ -12,7 +12,7 @@ router.get('/', protect, admin, async (req, res) => {
     if (req.activeStore) {
       filter.store = req.activeStore;
     }
-    const vendors = await Vendor.find(filter).sort({ createdAt: -1 });
+    const vendors = await Vendor.find(filter).sort({ createdAt: -1 }).lean();
     res.json(vendors);
   } catch (error) {
     res.status(500).json({ message: error.message });

@@ -81,6 +81,7 @@ router.post('/request-reset', protect, admin, async (req, res) => {
 
     store.deletionRequested = true;
     store.deletionRequestedAt = new Date();
+    store.deletionRequestedBy = `${req.user.name} (${req.user.email})`;
     await store.save();
 
     // Log the request
@@ -104,7 +105,7 @@ router.post('/request-reset', protect, admin, async (req, res) => {
 // @route   POST /api/system/reset
 // @access  Private/SuperAdmin
 router.post('/reset', protect, superAdmin, async (req, res) => {
-  const { password, storeId } = req.body;
+  const { password, storeId, includeUsers } = req.body;
   
   if (!password) {
     return res.status(400).json({ message: 'Password is required' });
@@ -136,6 +137,20 @@ router.post('/reset', protect, superAdmin, async (req, res) => {
     }
     // If storeId === 'all', filter remains {} (Delete All)
 
+    // Handle User Deletion if requested
+    if (includeUsers) {
+      const userFilter = { ...filter };
+      // NEVER delete Super Admin accounts
+      userFilter.role = { $ne: 'Super Admin' };
+      
+      // If specific store reset, we target users assigned to that store
+      if (storeId !== 'all') {
+        userFilter.assignedStore = storeId;
+      }
+
+      await User.deleteMany(userFilter);
+    }
+
     // Clear collections
     // NOTE: We intentionally preserve 'User' (Admins/Technicians), 'Store' (Definitions), and 'AssetCategory' (Configuration)
     // as per requirements to only delete "operational/transactional" data.
@@ -154,7 +169,8 @@ router.post('/reset', protect, superAdmin, async (req, res) => {
     if (storeId && storeId !== 'all') {
       await Store.findByIdAndUpdate(storeId, { 
         deletionRequested: false, 
-        deletionRequestedAt: null 
+        deletionRequestedAt: null,
+        deletionRequestedBy: null
       });
     }
 
@@ -185,7 +201,7 @@ router.post('/reset', protect, superAdmin, async (req, res) => {
       email: req.user.email,
       role: req.user.role,
       action: 'System Reset',
-      details: `${resetScope} reset performed (Users preserved)`,
+      details: `${resetScope} reset performed (${includeUsers ? 'Users DELETED' : 'Users preserved'})`,
       store: storeId && storeId !== 'all' ? storeId : null
     });
 

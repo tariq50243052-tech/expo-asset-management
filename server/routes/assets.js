@@ -434,9 +434,17 @@ router.get('/template', (req, res) => {
 router.post('/', protect, async (req, res) => {
   const { name, model_number, serial_number, mac_address, manufacturer, store, status, ticket_number, category, product_type, product_name, rfid, qr_code } = req.body;
   try {
-    const assetExists = await Asset.findOne({ serial_number });
+    // Check for duplicate serial number within the same store
+    const duplicateQuery = { serial_number };
+    if (req.activeStore) {
+      duplicateQuery.store = req.activeStore;
+    } else if (store) {
+      duplicateQuery.store = store;
+    }
+    
+    const assetExists = await Asset.findOne(duplicateQuery);
     if (assetExists) {
-      return res.status(400).json({ message: 'Asset with this serial number already exists' });
+      return res.status(400).json({ message: 'Asset with this serial number already exists in this store' });
     }
 
     // --- AUTO-CREATE HIERARCHY LOGIC ---
@@ -567,8 +575,8 @@ router.post('/bulk', protect, admin, async (req, res) => {
 
 // @desc    Bulk upload assets via Excel
 // @route   POST /api/assets/import
-// @access  Private/Admin
-router.post('/import', protect, admin, upload.single('file'), async (req, res) => {
+// @access  Private (Admin or Technician)
+router.post('/import', protect, upload.single('file'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'No file uploaded' });
   }
@@ -793,7 +801,7 @@ router.post('/import', protect, admin, upload.single('file'), async (req, res) =
       }
     }
 
-    // Check existing serials in DB
+    // Check existing serials in DB (Scoped to Store)
     let toInsert = assetsToInsert;
     if (!allowDuplicates && assetsToInsert.length > 0) {
       // Only check serials that are NOT N/A
@@ -802,18 +810,32 @@ router.post('/import', protect, admin, upload.single('file'), async (req, res) =
         .filter(s => !isNA(s));
       
       if (serialsToCheck.length > 0) {
-        const existing = await Asset.find({ serial_number: { $in: serialsToCheck } }).select('serial_number');
-        const existingSet = new Set(existing.map(e => e.serial_number));
+        // Find assets with these serials
+        const existing = await Asset.find({ serial_number: { $in: serialsToCheck } })
+          .select('serial_number store')
+          .lean();
+          
+        // Create a Set of "serial_storeId" strings for fast lookup
+        // If an existing asset has no store, we treat it as global (collision for everyone) or maybe ignore?
+        // Let's assume store is required.
+        const existingSet = new Set();
+        existing.forEach(e => {
+          if (e.store) existingSet.add(`${e.serial_number}_${e.store.toString()}`);
+        });
         
         toInsert = assetsToInsert.filter(a => {
           // Always allow N/A serials to proceed
           if (isNA(a.serial_number)) return true;
           
-          const isDup = existingSet.has(a.serial_number);
+          // Check if this specific asset (serial + target store) exists
+          // a.store is the ID we resolved earlier
+          const key = `${a.serial_number}_${a.store}`;
+          const isDup = existingSet.has(key);
+          
           if (isDup) {
             duplicates.push({ 
               serial: a.serial_number, 
-              reason: 'Duplicate in database',
+              reason: 'Duplicate in database (same store)',
               asset: a 
             });
           }

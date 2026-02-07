@@ -33,6 +33,10 @@ const storeSchema = new mongoose.Schema({
   },
   deletionRequestedAt: {
     type: Date
+  },
+  deletionRequestedBy: {
+    type: String, // Store email or name of requester
+    default: null
   }
 }, { timestamps: true });
 

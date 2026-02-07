@@ -14,6 +14,9 @@ router.get('/', protect, admin, async (req, res) => {
     // RBAC: If not Super Admin, filter by assigned store
     if (req.user.role !== 'Super Admin' && req.user.assignedStore) {
       filter.assignedStore = req.user.assignedStore;
+    } else if (req.user.role === 'Super Admin' && req.activeStore) {
+      // If Super Admin has selected a store context, filter by it
+      filter.assignedStore = req.activeStore;
     }
 
     const users = await User.find(filter).populate('assignedStore').lean();
