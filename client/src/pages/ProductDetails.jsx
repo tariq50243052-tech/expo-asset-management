@@ -10,6 +10,10 @@ const ProductDetails = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  
+  // Client-side pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
 
   // Decode product name from URL
   const decodedProductName = decodeURIComponent(productName);
@@ -43,6 +47,17 @@ const ProductDetails = () => {
     asset.status?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     asset.assigned_to?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Pagination Logic
+  const totalPages = Math.ceil(filteredAssets.length / itemsPerPage);
+  const paginatedAssets = filteredAssets.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   // Calculate stats
   const stats = {
@@ -240,7 +255,7 @@ const ProductDetails = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredAssets.map((asset) => (
+                {paginatedAssets.map((asset) => (
                   <tr key={asset._id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col">
@@ -290,6 +305,31 @@ const ProductDetails = () => {
               </tbody>
             </table>
           </div>
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+              <div className="text-sm text-gray-500">
+                Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredAssets.length)}</span> of <span className="font-medium">{filteredAssets.length}</span> results
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 border border-gray-300 rounded-md bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 border border-gray-300 rounded-md bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -120,4 +120,14 @@ assetSchema.index({ store: 1, updatedAt: -1 });
 assetSchema.index({ store: 1, status: 1 });
 assetSchema.index({ updatedAt: -1 });
 
+// Text index for fast search
+assetSchema.index({
+  name: 'text',
+  model_number: 'text',
+  serial_number: 'text',
+  manufacturer: 'text',
+  product_name: 'text',
+  ticket_number: 'text'
+});
+
 module.exports = mongoose.model('Asset', assetSchema);
