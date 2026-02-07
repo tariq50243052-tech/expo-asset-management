@@ -77,12 +77,56 @@ try {
   console.error('Error checking static files:', error);
 }
 
+// 404 Handler (Must be before Catch-all for API 404s, but here we want catch-all to handle everything else)
+// Actually, we should handle API 404s explicitly if we want JSON response, otherwise catch-all takes it.
+// Let's stick to standard order: 
+// 1. API Routes (already defined above)
+// 2. Static Files
+// 3. Catch-All (SPA or Fallback)
+
+// Debug Route to check File System (Temporary)
+app.get('/debug-fs', (req, res) => {
+  const fs = require('fs');
+  const debugInfo = {
+    cwd: process.cwd(),
+    __dirname: __dirname,
+    clientDistPath: clientDist,
+    clientDistExists: fs.existsSync(clientDist),
+    rootDirContents: [],
+    clientDirContents: [],
+    distDirContents: []
+  };
+
+  try {
+    const rootDir = path.resolve(__dirname, '..');
+    debugInfo.rootDirContents = fs.readdirSync(rootDir);
+    
+    const clientDir = path.resolve(rootDir, 'client');
+    if (fs.existsSync(clientDir)) {
+      debugInfo.clientDirContents = fs.readdirSync(clientDir);
+    }
+    
+    if (fs.existsSync(clientDist)) {
+      debugInfo.distDirContents = fs.readdirSync(clientDist);
+    }
+  } catch (error) {
+    debugInfo.error = error.message;
+  }
+
+  res.json(debugInfo);
+});
+
 if (clientBuilt) {
   console.log('Serving static files from:', clientDist);
   app.use(express.static(clientDist));
   
   // Catch-all handler for SPA
-  app.get(/^\/(?!api).*/, (req, res) => {
+  app.get('*', (req, res) => {
+    // Skip if request is for API (redundant if API routes matched first, but safe)
+    if (req.path.startsWith('/api')) {
+       return res.status(404).json({ message: 'API endpoint not found' });
+    }
+    
     // Double check file exists to prevent crashes
     if (fs.existsSync(indexHtml)) {
       res.sendFile(indexHtml);
@@ -93,7 +137,19 @@ if (clientBuilt) {
 } else {
   console.log('Client dist folder or index.html not found at:', clientDist);
   // Fallback route if client is not built - catch ALL non-api routes
-  app.get(/^\/(?!api).*/, (req, res) => {
+  app.get('*', (req, res) => {
+    if (req.path.startsWith('/api')) {
+       return res.status(404).json({ message: 'API endpoint not found' });
+    }
+
+    // Check if it's the debug route
+    if (req.path === '/debug-fs') {
+        // We need to define debug route BEFORE this catch-all if we want it to work in this block
+        // Or just let this fall through? No, app.get('*') captures it.
+        // Let's move debug route UP.
+        return res.status(404).send('Debug route moved');
+    }
+
     res.status(200).send(`
       <div style="font-family: sans-serif; padding: 20px; max-width: 800px; margin: 0 auto;">
         <h1>API is running successfully</h1>
@@ -211,38 +267,6 @@ const seedAdmin = async () => {
 // 404 Handler (Last Route)
 app.use((req, res) => {
   res.status(404).send('Not Found');
-});
-
-// Debug Route to check File System (Temporary)
-app.get('/debug-fs', (req, res) => {
-  const fs = require('fs');
-  const debugInfo = {
-    cwd: process.cwd(),
-    __dirname: __dirname,
-    clientDistPath: clientDist,
-    clientDistExists: fs.existsSync(clientDist),
-    rootDirContents: [],
-    clientDirContents: [],
-    distDirContents: []
-  };
-
-  try {
-    const rootDir = path.resolve(__dirname, '..');
-    debugInfo.rootDirContents = fs.readdirSync(rootDir);
-    
-    const clientDir = path.resolve(rootDir, 'client');
-    if (fs.existsSync(clientDir)) {
-      debugInfo.clientDirContents = fs.readdirSync(clientDir);
-    }
-    
-    if (fs.existsSync(clientDist)) {
-      debugInfo.distDirContents = fs.readdirSync(clientDist);
-    }
-  } catch (error) {
-    debugInfo.error = error.message;
-  }
-
-  res.json(debugInfo);
 });
 
 const PORT = process.env.PORT || 5000;
