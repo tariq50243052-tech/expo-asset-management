@@ -102,7 +102,7 @@ const Portal = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col font-sans text-slate-900 bg-slate-50 relative overflow-hidden">
+    <div className="min-h-screen flex flex-col font-sans text-slate-900 bg-slate-50 relative overflow-x-hidden">
       
       {/* Navbar */}
       <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 transition-all duration-300">
@@ -155,49 +155,57 @@ const Portal = () => {
 
         {/* Stores Grid Section */}
         <div className="mb-12 md:mb-16">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
-            {stores.map((store) => (
-              <button
-                key={store._id}
-                onClick={() => handleSelectStore(store)}
-                className={`group relative bg-white border border-slate-200 rounded-2xl p-5 md:p-6 shadow-sm hover:shadow-xl hover:border-amber-500/30 transition-all duration-300 text-left flex flex-col justify-between h-auto min-h-[180px] md:h-56 overflow-hidden ${
-                  activeStore?._id === store._id 
-                    ? 'ring-2 ring-amber-500 shadow-amber-500/10' 
-                    : ''
-                }`}
-              >
-                <div className="absolute top-0 right-0 w-24 h-24 md:w-32 md:h-32 bg-gradient-to-br from-amber-500/10 to-transparent rounded-bl-full -mr-8 -mt-8 md:-mr-10 md:-mt-10 transition-transform group-hover:scale-110 opacity-50 group-hover:opacity-100"></div>
-                
-                <div className="relative z-10 w-full">
-                  <div className="flex items-center justify-between mb-4 md:mb-6">
-                    <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-700 group-hover:bg-amber-500 group-hover:text-white group-hover:border-amber-500 transition-all shadow-inner">
-                      <Building2 size={24} className="md:w-[28px] md:h-[28px]" />
-                    </div>
-                    {activeStore?._id === store._id && (
-                      <span className="inline-flex items-center px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold bg-green-50 text-green-600 border border-green-200">
-                        ACTIVE
-                      </span>
-                    )}
-                  </div>
+          {stores.length === 0 ? (
+             <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 border-dashed">
+                <Store size={48} className="mx-auto text-slate-300 mb-3" />
+                <h3 className="text-lg font-semibold text-slate-900">No Stores Found</h3>
+                <p className="text-slate-500 text-sm">No active stores are currently available.</p>
+             </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
+              {stores.map((store) => (
+                <button
+                  key={store._id}
+                  onClick={() => handleSelectStore(store)}
+                  className={`group relative bg-white border border-slate-200 rounded-2xl p-5 md:p-6 shadow-sm hover:shadow-xl hover:border-amber-500/30 transition-all duration-300 text-left flex flex-col justify-between h-auto min-h-[180px] md:h-56 overflow-hidden ${
+                    activeStore?._id === store._id 
+                      ? 'ring-2 ring-amber-500 shadow-amber-500/10' 
+                      : ''
+                  }`}
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 md:w-32 md:h-32 bg-gradient-to-br from-amber-500/10 to-transparent rounded-bl-full -mr-8 -mt-8 md:-mr-10 md:-mt-10 transition-transform group-hover:scale-110 opacity-50 group-hover:opacity-100"></div>
                   
-                  <h4 className="text-xl md:text-2xl font-bold text-slate-900 mb-1 group-hover:text-amber-600 transition-colors tracking-wide truncate">
-                    {store.name}
-                  </h4>
-                  <p className="text-xs md:text-sm text-slate-400 font-mono">ID: {store._id.substring(store._id.length - 6).toUpperCase()}</p>
-                </div>
-
-                <div className="relative z-10 pt-4 border-t border-slate-100 mt-4 md:mt-auto flex justify-between items-center w-full">
-                  <span className="text-[10px] md:text-xs font-medium text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${store.isActive ? 'bg-green-500' : 'bg-green-500'}`}></div>
-                    {store.openingTime} - {store.closingTime}
-                  </span>
-                  <div className="flex items-center text-amber-500 text-xs md:text-sm font-bold opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all transform translate-x-0 md:translate-x-4 md:group-hover:translate-x-0">
-                    ENTER <ChevronRight size={14} className="ml-1 md:w-[16px] md:h-[16px]" />
+                  <div className="relative z-10 w-full">
+                    <div className="flex items-center justify-between mb-4 md:mb-6">
+                      <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-700 group-hover:bg-amber-500 group-hover:text-white group-hover:border-amber-500 transition-all shadow-inner">
+                        <Building2 size={24} className="md:w-[28px] md:h-[28px]" />
+                      </div>
+                      {activeStore?._id === store._id && (
+                        <span className="inline-flex items-center px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold bg-green-50 text-green-600 border border-green-200">
+                          ACTIVE
+                        </span>
+                      )}
+                    </div>
+                    
+                    <h4 className="text-xl md:text-2xl font-bold text-slate-900 mb-1 group-hover:text-amber-600 transition-colors tracking-wide truncate">
+                      {store.name}
+                    </h4>
+                    <p className="text-xs md:text-sm text-slate-400 font-mono">ID: {store._id.substring(store._id.length - 6).toUpperCase()}</p>
                   </div>
-                </div>
-              </button>
-            ))}
-          </div>
+
+                  <div className="relative z-10 pt-4 border-t border-slate-100 mt-4 md:mt-auto flex justify-between items-center w-full">
+                    <span className="text-[10px] md:text-xs font-medium text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${store.isActive ? 'bg-green-500' : 'bg-green-500'}`}></div>
+                      {store.openingTime} - {store.closingTime}
+                    </span>
+                    <div className="flex items-center text-amber-500 text-xs md:text-sm font-bold opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all transform translate-x-0 md:translate-x-4 md:group-hover:translate-x-0">
+                      ENTER <ChevronRight size={14} className="ml-1 md:w-[16px] md:h-[16px]" />
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Quick Actions Grid - Admin Tools */}
