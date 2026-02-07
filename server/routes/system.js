@@ -158,4 +158,45 @@ router.get('/stores', protect, async (req, res) => {
   }
 });
 
+// @desc    Seed default stores
+// @route   POST /api/system/seed
+// @access  Private/SuperAdmin
+router.post('/seed', protect, superAdmin, async (req, res) => {
+  try {
+    const storesData = [
+      { name: 'SCY ASSET', alias: 'scy' },
+      { name: 'IT ASSET', alias: 'it' },
+      { name: 'NOC ASSET', alias: 'noc' }
+    ];
+
+    const results = [];
+
+    for (const data of storesData) {
+      let store = await Store.findOne({ name: data.name });
+      if (!store) {
+        store = await Store.create({ 
+            name: data.name, 
+            isMainStore: true,
+            openingTime: '09:00', 
+            closingTime: '17:00' 
+        });
+        results.push(`Created: ${store.name}`);
+      } else {
+        if (!store.isMainStore) {
+            store.isMainStore = true;
+            await store.save();
+            results.push(`Updated (set Main): ${store.name}`);
+        } else {
+            results.push(`Exists: ${store.name}`);
+        }
+      }
+    }
+
+    res.json({ message: 'Seeding complete', results });
+  } catch (error) {
+    console.error('Seeding error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 module.exports = router;

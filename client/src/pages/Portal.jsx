@@ -43,6 +43,21 @@ const Portal = () => {
     navigate('/');
   };
 
+  const handleInitializeSystem = async () => {
+    if (!window.confirm('This will create default main stores (SCY, IT, NOC). Continue?')) return;
+    
+    try {
+      setLoading(true);
+      await api.post('/system/seed');
+      alert('System initialized successfully. Reloading...');
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to initialize system: ' + (err.response?.data?.message || err.message));
+      setLoading(false);
+    }
+  };
+
   const handleResetDatabase = async () => {
     if (!resetPassword) return alert('Password required');
     if (!resetStoreId) return alert('Please select a scope');
@@ -159,7 +174,14 @@ const Portal = () => {
              <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 border-dashed">
                 <Store size={48} className="mx-auto text-slate-300 mb-3" />
                 <h3 className="text-lg font-semibold text-slate-900">No Stores Found</h3>
-                <p className="text-slate-500 text-sm">No active stores are currently available.</p>
+                <p className="text-slate-500 text-sm mb-4">No active stores are currently available.</p>
+                <button 
+                  onClick={handleInitializeSystem}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors font-medium text-sm shadow-sm"
+                >
+                  <Database size={16} />
+                  Initialize System Defaults
+                </button>
              </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">

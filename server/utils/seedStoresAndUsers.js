@@ -17,10 +17,16 @@ const seedStoresAndUsers = async () => {
     for (const sData of storesData) {
       let store = await Store.findOne({ name: sData.name });
       if (!store) {
-        store = await Store.create(sData);
-        console.log(`Created Store: ${sData.name}`);
+        store = await Store.create({ ...sData, isMainStore: true });
+        console.log(`Created Main Store: ${sData.name}`);
       } else {
-        console.log(`Store exists: ${sData.name}`);
+        if (!store.isMainStore) {
+            store.isMainStore = true;
+            await store.save();
+            console.log(`Updated Store (set Main): ${sData.name}`);
+        } else {
+            console.log(`Store exists: ${sData.name}`);
+        }
       }
       storeMap[sData.name] = store;
     }
