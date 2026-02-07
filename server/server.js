@@ -64,30 +64,56 @@ const ActivityLog = require('./models/ActivityLog');
 const { protect, admin } = require('./middleware/authMiddleware');
 
 // Serve built client in production
+const fs = require('fs');
 const clientDist = path.resolve(__dirname, '../client/dist');
+const indexHtml = path.join(clientDist, 'index.html');
+let clientBuilt = false;
+
 try {
-  const fs = require('fs');
-  if (fs.existsSync(clientDist)) {
-    console.log('Serving static files from:', clientDist);
-    app.use(express.static(clientDist));
-    app.get(/^\/(?!api).*/, (req, res) => {
-      console.log('Serving index.html for:', req.url);
-      res.sendFile(path.join(clientDist, 'index.html'));
-    });
-  } else {
-    console.log('Client dist folder not found at:', clientDist);
-    // Fallback route if client is not built
-    app.get('/', (req, res) => {
-      res.status(200).send(`
-        <h1>API is running successfully</h1>
-        <p><strong>Note:</strong> Frontend client is not served because the build folder was not found.</p>
-        <p>Please check your deployment build logs.</p>
-        <p>Debug info available at <a href="/debug-fs">/debug-fs</a></p>
-      `);
-    });
+  if (fs.existsSync(clientDist) && fs.existsSync(indexHtml)) {
+    clientBuilt = true;
   }
 } catch (error) {
-  console.error('Error setting up static files:', error);
+  console.error('Error checking static files:', error);
+}
+
+if (clientBuilt) {
+  console.log('Serving static files from:', clientDist);
+  app.use(express.static(clientDist));
+  
+  // Catch-all handler for SPA
+  app.get(/^\/(?!api).*/, (req, res) => {
+    // Double check file exists to prevent crashes
+    if (fs.existsSync(indexHtml)) {
+      res.sendFile(indexHtml);
+    } else {
+      res.status(500).send('index.html missing');
+    }
+  });
+} else {
+  console.log('Client dist folder or index.html not found at:', clientDist);
+  // Fallback route if client is not built - catch ALL non-api routes
+  app.get(/^\/(?!api).*/, (req, res) => {
+    res.status(200).send(`
+      <div style="font-family: sans-serif; padding: 20px; max-width: 800px; margin: 0 auto;">
+        <h1>API is running successfully</h1>
+        <div style="background: #fff3cd; color: #856404; padding: 15px; border-radius: 4px; margin: 20px 0;">
+          <strong>Warning:</strong> Frontend client is not served because the build folder was not found.
+        </div>
+        <p>This likely means the build command on Render is incorrect.</p>
+        
+        <h3>Required Render Settings:</h3>
+        <ul>
+          <li><strong>Root Directory:</strong> <code>.</code> (Leave empty)</li>
+          <li><strong>Build Command:</strong> <code>npm run build</code></li>
+          <li><strong>Start Command:</strong> <code>npm start</code></li>
+        </ul>
+        
+        <p>Debug info available at <a href="/debug-fs">/debug-fs</a></p>
+        <p>Current Path: ${req.url}</p>
+      </div>
+    `);
+  });
 }
 
 // Connect to MongoDB
