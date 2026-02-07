@@ -67,31 +67,15 @@ const { protect, admin } = require('./middleware/authMiddleware');
 const fs = require('fs');
 const clientDist = path.resolve(__dirname, '../client/dist');
 const indexHtml = path.join(clientDist, 'index.html');
-let clientBuilt = false;
 
-try {
-  if (fs.existsSync(clientDist) && fs.existsSync(indexHtml)) {
-    clientBuilt = true;
-  }
-} catch (error) {
-  console.error('Error checking static files:', error);
-}
-
-// 404 Handler (Must be before Catch-all for API 404s, but here we want catch-all to handle everything else)
-// Actually, we should handle API 404s explicitly if we want JSON response, otherwise catch-all takes it.
-// Let's stick to standard order: 
-// 1. API Routes (already defined above)
-// 2. Static Files
-// 3. Catch-All (SPA or Fallback)
-
-// Debug Route to check File System (Temporary)
+// 1. Debug Route (Always available)
 app.get('/debug-fs', (req, res) => {
-  const fs = require('fs');
   const debugInfo = {
     cwd: process.cwd(),
     __dirname: __dirname,
     clientDistPath: clientDist,
     clientDistExists: fs.existsSync(clientDist),
+    indexHtmlExists: fs.existsSync(indexHtml),
     rootDirContents: [],
     clientDirContents: [],
     distDirContents: []
@@ -99,16 +83,12 @@ app.get('/debug-fs', (req, res) => {
 
   try {
     const rootDir = path.resolve(__dirname, '..');
-    debugInfo.rootDirContents = fs.readdirSync(rootDir);
+    if (fs.existsSync(rootDir)) debugInfo.rootDirContents = fs.readdirSync(rootDir);
     
     const clientDir = path.resolve(rootDir, 'client');
-    if (fs.existsSync(clientDir)) {
-      debugInfo.clientDirContents = fs.readdirSync(clientDir);
-    }
+    if (fs.existsSync(clientDir)) debugInfo.clientDirContents = fs.readdirSync(clientDir);
     
-    if (fs.existsSync(clientDist)) {
-      debugInfo.distDirContents = fs.readdirSync(clientDist);
-    }
+    if (fs.existsSync(clientDist)) debugInfo.distDirContents = fs.readdirSync(clientDist);
   } catch (error) {
     debugInfo.error = error.message;
   }
@@ -116,61 +96,52 @@ app.get('/debug-fs', (req, res) => {
   res.json(debugInfo);
 });
 
-if (clientBuilt) {
+// 2. Version Route (Always available)
+app.get('/version', (req, res) => {
+  res.send('v1.0.2 - Unconditional Routing Fix');
+});
+
+// 3. Static Files (Try to serve if they exist)
+if (fs.existsSync(clientDist)) {
   console.log('Serving static files from:', clientDist);
   app.use(express.static(clientDist));
-  
-  // Catch-all handler for SPA
-  app.get('*', (req, res) => {
-    // Skip if request is for API (redundant if API routes matched first, but safe)
-    if (req.path.startsWith('/api')) {
-       return res.status(404).json({ message: 'API endpoint not found' });
-    }
-    
-    // Double check file exists to prevent crashes
-    if (fs.existsSync(indexHtml)) {
-      res.sendFile(indexHtml);
-    } else {
-      res.status(500).send('index.html missing');
-    }
-  });
 } else {
-  console.log('Client dist folder or index.html not found at:', clientDist);
-  // Fallback route if client is not built - catch ALL non-api routes
-  app.get('*', (req, res) => {
-    if (req.path.startsWith('/api')) {
-       return res.status(404).json({ message: 'API endpoint not found' });
-    }
-
-    // Check if it's the debug route
-    if (req.path === '/debug-fs') {
-        // We need to define debug route BEFORE this catch-all if we want it to work in this block
-        // Or just let this fall through? No, app.get('*') captures it.
-        // Let's move debug route UP.
-        return res.status(404).send('Debug route moved');
-    }
-
-    res.status(200).send(`
-      <div style="font-family: sans-serif; padding: 20px; max-width: 800px; margin: 0 auto;">
-        <h1>API is running successfully</h1>
-        <div style="background: #fff3cd; color: #856404; padding: 15px; border-radius: 4px; margin: 20px 0;">
-          <strong>Warning:</strong> Frontend client is not served because the build folder was not found.
-        </div>
-        <p>This likely means the build command on Render is incorrect.</p>
-        
-        <h3>Required Render Settings:</h3>
-        <ul>
-          <li><strong>Root Directory:</strong> <code>.</code> (Leave empty)</li>
-          <li><strong>Build Command:</strong> <code>npm run build</code></li>
-          <li><strong>Start Command:</strong> <code>npm start</code></li>
-        </ul>
-        
-        <p>Debug info available at <a href="/debug-fs">/debug-fs</a></p>
-        <p>Current Path: ${req.url}</p>
-      </div>
-    `);
-  });
+  console.log('Client dist folder NOT found at:', clientDist);
 }
+
+// 4. Catch-All Handler (Handles SPA and Fallback)
+app.get('*', (req, res) => {
+  // A. Skip API routes (redundant but safe)
+  if (req.path.startsWith('/api')) {
+     return res.status(404).json({ message: 'API endpoint not found' });
+  }
+  
+  // B. Serve index.html if it exists
+  if (fs.existsSync(indexHtml)) {
+    return res.sendFile(indexHtml);
+  } 
+  
+  // C. Fallback Warning Page (If build is missing)
+  res.status(200).send(`
+    <div style="font-family: sans-serif; padding: 20px; max-width: 800px; margin: 0 auto;">
+      <h1>API is running successfully (v1.0.2)</h1>
+      <div style="background: #fff3cd; color: #856404; padding: 15px; border-radius: 4px; margin: 20px 0;">
+        <strong>Warning:</strong> Frontend client is not served because the build folder was not found.
+      </div>
+      <p>This likely means the build command on Render is incorrect or failed.</p>
+      
+      <h3>Required Render Settings:</h3>
+      <ul>
+        <li><strong>Root Directory:</strong> <code>.</code> (Leave empty)</li>
+        <li><strong>Build Command:</strong> <code>npm run build</code></li>
+        <li><strong>Start Command:</strong> <code>npm start</code></li>
+      </ul>
+      
+      <p>Debug info available at <a href="/debug-fs">/debug-fs</a></p>
+      <p>Current Path: ${req.url}</p>
+    </div>
+  `);
+});
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI)
