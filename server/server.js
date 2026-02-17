@@ -1,3 +1,8 @@
+require('dotenv').config(); // This must be line 1
+const mongoose = require('mongoose');
+
+// This will now find the string instead of 'undefined'
+mongoose.connect(process.env.MONGO_URI); 
 const express = require('express');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
